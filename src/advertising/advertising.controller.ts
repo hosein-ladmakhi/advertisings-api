@@ -1,4 +1,4 @@
-import { Controller, Get, Inject } from '@nestjs/common';
+import { Controller, Get, Inject, Param } from '@nestjs/common';
 import { AdvertisingService } from './advertising.service';
 
 @Controller('advertising')
@@ -8,5 +8,10 @@ export class AdvertisingController {
   @Get()
   getAdvertisings() {
     return this.advertisingService.findAllAdvertisings();
+  }
+
+  @Get(':id')
+  getAdvertisingById(@Param('id') id: string) {
+    return this.advertisingService.findAdvertisingById(id);
   }
 }
