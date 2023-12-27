@@ -9,41 +9,33 @@ import { SupabaseService } from 'src/common/supabase/supabase.service';
 import { CreateCommentDTO } from './dtos/create-comment.dto';
 import { CreateAdvertisingDTO } from './dtos/create-advertising.dto';
 import { EditAdvertisingDTO } from './dtos/edit-advertising.dto';
+import { BaseService } from 'src/common/services/base-service.service';
 
 @Injectable()
-export class AdvertisingService {
-  @Inject(SupabaseService) private readonly supabaseService: SupabaseService;
+export class AdvertisingService extends BaseService<
+  CreateAdvertisingDTO,
+  EditAdvertisingDTO
+> {
+  public entity: string = 'advertisings';
+  constructor(public superbase: SupabaseService) {
+    super();
+  }
 
   async findAllAdvertisings() {
-    const response = await this.supabaseService
-      .getClient()
-      .from('advertisings')
-      .select()
-      .order('created_at', { ascending: true });
-
-    return response.data;
+    return this.selectAll(0, 10);
   }
 
   async findAdvertisingById(id: string) {
-    const response = await this.supabaseService
-      .getClient()
-      .from('advertisings')
-      .select('*, category(*), creator(*)')
-      .eq('id', id)
-      .single();
+    const advertising = await this.select(id, '*, category(*), creator(*)');
 
-    if (!response) {
-      throw new NotFoundException('advertising not defined');
-    }
-
-    const comments = await this.supabaseService
+    const comments = await this.superbase
       .getClient()
       .from('comments')
       .select('*, parent(*), author(*),children(*)')
       .eq('advertising', id);
 
     return {
-      ...response.data,
+      ...advertising,
       comments: comments?.data?.filter((e) => !e?.parent),
     };
   }
@@ -56,7 +48,7 @@ export class AdvertisingService {
           (element) => element !== creator,
         );
       else advertising.likes.push(creator);
-      await this.updateAdvertising(id, { likes: advertising.likes });
+      await this.edit(id, { likes: advertising.likes } as any);
       return true;
     } catch (error) {
       return false;
@@ -69,25 +61,16 @@ export class AdvertisingService {
       if (!advertising.views.find((element) => element === creator)) {
         advertising.views.push(creator);
       }
-      await this.updateAdvertising(id, { views: advertising.views });
+      await this.edit(id, { views: advertising.views } as any);
       return true;
     } catch (error) {
       return false;
     }
   }
 
-  async updateAdvertising(id: string, dto: any) {
-    await this.supabaseService
-      .getClient()
-      .from('advertisings')
-      .update(dto)
-      .eq('id', id);
-    return this.findAdvertisingById(id);
-  }
-
   async newComment(author: string, dto: CreateCommentDTO) {
     await this.findAdvertisingById(dto.advertising);
-    const comment = await this.supabaseService
+    const comment = await this.superbase
       .getClient()
       .from('comments')
       .insert({
@@ -98,7 +81,7 @@ export class AdvertisingService {
       .single();
 
     if (dto.parent) {
-      await this.supabaseService
+      await this.superbase
         .getClient()
         .from('comments')
         .update({ children: comment?.data?.id })
@@ -109,7 +92,7 @@ export class AdvertisingService {
 
   async deleteComment(id: string, author: string) {
     const comment = (
-      await this.supabaseService
+      await this.superbase
         .getClient()
         .from('comments')
         .select()
@@ -122,42 +105,32 @@ export class AdvertisingService {
 
     try {
       if (comment?.parent) {
-        console.log(
-          'update parent',
-          await this.supabaseService
-            .getClient()
-            .from('comments')
-            .update({ children: null })
-            .eq('id', comment?.parent),
-        );
-        console.log(
-          await this.supabaseService
-            .getClient()
-            .from('comments')
-            .delete()
-            .eq('id', comment?.parent),
-        );
+        await this.superbase
+          .getClient()
+          .from('comments')
+          .update({ children: null })
+          .eq('id', comment?.parent);
+        await this.superbase
+          .getClient()
+          .from('comments')
+          .delete()
+          .eq('id', comment?.parent);
       }
 
       if (comment?.children) {
-        console.log(
-          'update children',
-          await this.supabaseService
-            .getClient()
-            .from('comments')
-            .update({ parent: null })
-            .eq('id', comment?.children),
-        );
-        console.log(
-          await this.supabaseService
-            .getClient()
-            .from('comments')
-            .delete()
-            .eq('id', comment?.children),
-        );
+        await this.superbase
+          .getClient()
+          .from('comments')
+          .update({ parent: null })
+          .eq('id', comment?.children);
+        await this.superbase
+          .getClient()
+          .from('comments')
+          .delete()
+          .eq('id', comment?.children);
       }
 
-      await this.supabaseService
+      await this.superbase
         .getClient()
         .from('comments')
         .delete()
@@ -171,7 +144,7 @@ export class AdvertisingService {
   }
 
   async createAdvertising(dto: CreateAdvertisingDTO, creator: string) {
-    const duplicateTitle = await this.supabaseService
+    const duplicateTitle = await this.superbase
       .getClient()
       .from('advertisings')
       .select()
@@ -182,60 +155,49 @@ export class AdvertisingService {
       throw new ConflictException('duplicated title');
     }
 
-    const response = await this.supabaseService
-      .getClient()
-      .from('advertisings')
-      .insert({
-        images: dto.images,
-        title: dto.title,
-        content: dto.content,
-        category: dto.category,
-        creator,
-        is_visible: dto.isVisible,
-        min_price: dto.minPrice,
-        max_price: dto.maxPrice,
-        location: dto.location,
-        tags: dto.tags,
-        likeable: dto.isLikeable,
-        commetable: dto.isCommentable,
-        viewable: dto.isViewable,
-        likes: [],
-        views: [],
-      })
-      .select();
+    const data = {
+      images: dto.images,
+      title: dto.title,
+      content: dto.content,
+      category: dto.category,
+      creator,
+      is_visible: dto.isVisible,
+      min_price: dto.minPrice,
+      max_price: dto.maxPrice,
+      location: dto.location,
+      tags: dto.tags,
+      likeable: dto.isLikeable,
+      commetable: dto.isCommentable,
+      viewable: dto.isViewable,
+      likes: [],
+      views: [],
+    };
 
-    return response?.data;
+    return this.create(data as any);
   }
 
   async editAdvertising(dto: EditAdvertisingDTO, creator: string, id: string) {
-    const advertising = await this.findAdvertisingById(id);
+    const advertising = await this.select(id);
 
     if (advertising?.creator?.id !== creator) {
       throw new BadRequestException('only creator can update');
     }
-    const response = await this.supabaseService
-      .getClient()
-      .from('advertisings')
-      .update({
-        images: dto.images || advertising.images,
-        title: dto.title || advertising.title,
-        content: dto.content || advertising.content,
-        category: dto.category || advertising.category,
-        is_visible: dto.isVisible || advertising.is_visible,
-        min_price: dto.minPrice || advertising.min_price,
-        max_price: dto.maxPrice || advertising.max_price,
-        location: dto.location || advertising.location,
-        tags: dto.tags || advertising.tags,
-        likeable: dto.isLikeable || advertising.likeable,
-        commetable: dto.isCommentable || advertising.commentable,
-        viewable: dto.isViewable || advertising.viewable,
-      })
-      .eq('id', id)
-      .select()
-      .single();
 
-    console.log(response);
+    const data = {
+      images: dto.images || advertising.images,
+      title: dto.title || advertising.title,
+      content: dto.content || advertising.content,
+      category: dto.category || advertising.category,
+      is_visible: dto.isVisible || advertising.is_visible,
+      min_price: dto.minPrice || advertising.min_price,
+      max_price: dto.maxPrice || advertising.max_price,
+      location: dto.location || advertising.location,
+      tags: dto.tags || advertising.tags,
+      likeable: dto.isLikeable || advertising.likeable,
+      commetable: dto.isCommentable || advertising.commentable,
+      viewable: dto.isViewable || advertising.viewable,
+    };
 
-    return response?.data;
+    return this.edit(id, data);
   }
 }

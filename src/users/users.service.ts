@@ -1,53 +1,27 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { SupabaseService } from 'src/common/supabase/supabase.service';
+import { Injectable } from '@nestjs/common';
 import { UpdateUserDTO } from './dtos/update-user.dto';
+import { BaseService } from 'src/common/services/base-service.service';
 
 @Injectable()
-export class UsersService {
-  @Inject(SupabaseService) private readonly supabaseService: SupabaseService;
+export class UsersService extends BaseService<{}, UpdateUserDTO> {
+  public entity: string = 'users';
+  constructor() {
+    super();
+  }
 
   async deleteUser(id: string) {
-    const response = await this.supabaseService
-      .getClient()
-      .from('users')
-      .delete({ count: 'exact' })
-      .eq('id', id);
-    if (response?.count === 0) return false;
-    return true;
+    return this.delete(id);
   }
 
   async updateUser(id: string, dto: UpdateUserDTO) {
-    await this.supabaseService
-      .getClient()
-      .from('users')
-      .update(dto)
-      .eq('id', id);
-
-    return this.findUserById(id);
+    return this.edit(id, dto);
   }
 
   async findUserById(id: string) {
-    const user = await this.supabaseService
-      .getClient()
-      .from('users')
-      .select()
-      .eq('id', id)
-      .single();
-
-    if (!user?.data) {
-      throw new NotFoundException('user is not defined');
-    }
-
-    return user?.data;
+    return this.select(id);
   }
 
   async findUsers() {
-    const users = await this.supabaseService
-      .getClient()
-      .from('users')
-      .select()
-      .order('created_at', { ascending: false });
-
-    return users?.data;
+    return this.selectAll(0, 10);
   }
 }

@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { CategoriesModule } from './categories/categories.module';
 import { UploadModule } from './upload/upload.module';
 import { AdvertisingModule } from './advertising/advertising.module';
+import { BaseService } from './common/services/base-service.service';
 
 @Module({
   imports: [
@@ -19,5 +20,7 @@ import { AdvertisingModule } from './advertising/advertising.module';
     UploadModule,
     AdvertisingModule,
   ],
+  providers: [BaseService],
+  exports: [BaseService],
 })
 export class AppModule {}
