@@ -3,11 +3,13 @@ import {
   Inject,
   Post,
   UploadedFile,
+  UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
 import { File } from './dtos/file.dto';
+import * as jimp from 'jimp';
 
 @Controller('upload')
 export class UploadController {
@@ -17,5 +19,11 @@ export class UploadController {
   @UseInterceptors(FileInterceptor('file'))
   uploadFile(@UploadedFile() uplaodedFile: File) {
     return this.uploadService.uploadFile(uplaodedFile);
+  }
+
+  @Post('advertising')
+  @UseInterceptors(FilesInterceptor('images'))
+  imageWithThumbnail(@UploadedFiles() uplaodedFile: File[]) {
+    return this.uploadService.uploadAdvertisingImages(uplaodedFile);
   }
 }

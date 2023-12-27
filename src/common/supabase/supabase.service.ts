@@ -1,16 +1,12 @@
-import { Inject, Injectable, Scope } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { REQUEST } from '@nestjs/core';
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
-import { Request } from 'express';
-import { ExtractJwt } from 'passport-jwt';
 
 @Injectable()
 export class SupabaseService {
-  @Inject(ConfigService) private readonly configService: ConfigService;
-  @Inject(REQUEST) private readonly request: Request;
-
   private _supabase: SupabaseClient;
+
+  constructor(private readonly configService: ConfigService) {}
 
   getClient() {
     if (!this._supabase) {
