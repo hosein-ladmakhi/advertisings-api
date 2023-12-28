@@ -8,6 +8,9 @@ import { CategoriesModule } from './categories/categories.module';
 import { UploadModule } from './upload/upload.module';
 import { AdvertisingModule } from './advertising/advertising.module';
 import { BaseService } from './common/services/base-service.service';
+import { LocationsModule } from './locations/locations.module';
+import { ChatsModule } from './chats/chats.module';
+import { WsGuardService } from './common/services/ws-guard.service';
 
 @Module({
   imports: [
@@ -19,6 +22,8 @@ import { BaseService } from './common/services/base-service.service';
     CategoriesModule,
     UploadModule,
     AdvertisingModule,
+    LocationsModule,
+    ChatsModule,
   ],
   providers: [BaseService],
   exports: [BaseService],

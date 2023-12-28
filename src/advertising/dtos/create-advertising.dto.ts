@@ -13,4 +13,5 @@ export class CreateAdvertisingDTO {
   maxPrice: number;
   location: string;
   tags: string[];
+  city: string;
 }

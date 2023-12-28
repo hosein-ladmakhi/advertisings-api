@@ -171,6 +171,7 @@ export class AdvertisingService extends BaseService<
       viewable: dto.isViewable,
       likes: [],
       views: [],
+      city: dto.city,
     };
 
     return this.create(data as any);
@@ -184,6 +185,7 @@ export class AdvertisingService extends BaseService<
     }
 
     const data = {
+      city: dto.city,
       images: dto.images || advertising.images,
       title: dto.title || advertising.title,
       content: dto.content || advertising.content,

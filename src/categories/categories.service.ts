@@ -1,29 +1,50 @@
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { SupabaseService } from 'src/common/supabase/supabase.service';
 import { UpdateCategoryDTO } from './dtos/update-category.dto';
 import { CreateCategoryDTO } from './dtos/create-category.dto';
+import { BaseService } from 'src/common/services/base-service.service';
 
 @Injectable()
-export class CategoriesService {
-  @Inject(SupabaseService) private readonly supabaseService: SupabaseService;
+export class CategoriesService extends BaseService<
+  CreateCategoryDTO,
+  UpdateCategoryDTO
+> {
+  public entity: string = 'categories';
+  @Inject(SupabaseService)
+  private readonly supabaseClientService: SupabaseService;
 
   async deleteCategories(id: string) {
-    const response = await this.supabaseService
-      .getClient()
-      .from('categories')
-      .delete({ count: 'exact' })
-      .eq('id', id);
-    if (response?.count === 0) return false;
-    return true;
+    const category = await this.select(id);
+    if (category?.parent) {
+      await this.supabaseClientService
+        .getClient()
+        .from('categories')
+        .update({ children: null })
+        .eq('id', category?.parent);
+      await this.supabaseClientService
+        .getClient()
+        .from('categories')
+        .delete()
+        .eq('id', category?.parent);
+    }
+
+    if (category?.children) {
+      await this.supabaseClientService
+        .getClient()
+        .from('categories')
+        .update({ parent: null })
+        .eq('id', category?.children);
+      await this.supabaseClientService
+        .getClient()
+        .from('categories')
+        .delete()
+        .eq('id', category?.children);
+    }
+    return this.delete(id);
   }
 
   async updateCategories(id: string, dto: UpdateCategoryDTO) {
-    const checkUniqueName = await this.supabaseService
+    const checkUniqueName = await this.supabaseClientService
       .getClient()
       .from('categories')
       .select()
@@ -33,61 +54,39 @@ export class CategoriesService {
     if (checkUniqueName?.data?.id) {
       throw new ConflictException('duplicated name');
     }
-
-    await this.supabaseService
-      .getClient()
-      .from('categories')
-      .update(dto)
-      .eq('id', id);
-
-    return this.findCategoryById(id);
+    const category = await this.edit(id, dto);
+    if (dto.parent && category.parent !== dto.parent) {
+      await this.updateCategories(dto.parent, { children: category.id });
+    }
+    return category;
   }
 
   async createCategories(dto: CreateCategoryDTO) {
-    const checkUniqueName = await this.supabaseService
+    const checkUniqueName = await this.supabaseClientService
       .getClient()
       .from('categories')
       .select()
       .eq('name', dto.name)
       .single();
+
     if (checkUniqueName?.data?.id) {
       throw new ConflictException('duplicated name');
     }
 
-    await this.supabaseService.getClient().from('categories').insert(dto);
+    const category = await this.create(dto);
 
-    const category = await this.supabaseService
-      .getClient()
-      .from('categories')
-      .select()
-      .eq('name', dto.name)
-      .single();
+    if (dto.parent) {
+      this.updateCategories(dto.parent, { children: category.id });
+    }
 
-    return category?.data;
+    return category;
   }
 
   async findCategoryById(id: string) {
-    const category = await this.supabaseService
-      .getClient()
-      .from('categories')
-      .select()
-      .eq('id', id)
-      .single();
-
-    if (!category?.data) {
-      throw new NotFoundException('category is not defined');
-    }
-
-    return category?.data;
+    return this.select(id);
   }
 
   async findCategories() {
-    const categories = await this.supabaseService
-      .getClient()
-      .from('categories')
-      .select()
-      .order('created_at', { ascending: false });
-
-    return categories?.data;
+    return this.selectAll(0, 10, '*');
   }
 }

@@ -11,4 +11,5 @@ export class EditAdvertisingDTO {
   maxPrice?: number;
   location?: string;
   tags?: string[];
+  city?: string;
 }
