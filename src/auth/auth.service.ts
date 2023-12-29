@@ -43,7 +43,7 @@ export class AuthService {
       .getClient()
       .from('users')
       .insert(dto);
-
+    console.log(response);
     if (response.status === 201) {
       const user = await this.supabaseService
         .getClient()
