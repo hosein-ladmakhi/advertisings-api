@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,24 +8,52 @@ import { SupabaseService } from 'src/common/supabase/supabase.service';
 import { CreateCommentDTO } from './dtos/create-comment.dto';
 import { CreateAdvertisingDTO } from './dtos/create-advertising.dto';
 import { EditAdvertisingDTO } from './dtos/edit-advertising.dto';
-import { BaseService } from 'src/common/services/base-service.service';
 
 @Injectable()
-export class AdvertisingService extends BaseService<
-  CreateAdvertisingDTO,
-  EditAdvertisingDTO
-> {
-  public entity: string = 'advertisings';
-  constructor(public superbase: SupabaseService) {
-    super();
+export class AdvertisingService {
+  constructor(public superbase: SupabaseService) {}
+
+  async findAllAdvertisings(params) {
+    const page = params.page || 0;
+    const limit = params.limit || 10;
+
+    const entities = await this.superbase
+      .getClient()
+      .from('advertisings')
+      .select('*, category(*), creator(*)')
+      .range(page * limit, page * limit + limit)
+      .order('created_at', { ascending: false });
+
+    return entities?.data;
   }
 
-  async findAllAdvertisings() {
-    return this.selectAll(0, 10);
+  async findAllUserAdvertisings(params, user: any) {
+    const page = params.page || 0;
+    const limit = params.limit || 10;
+
+    const entities = await this.superbase
+      .getClient()
+      .from('advertisings')
+      .select('*, category(*), creator(*)')
+      .eq('creator', user?.id)
+      .range(page * limit, page * limit + limit)
+      .order('created_at', { ascending: false });
+
+    return entities?.data;
   }
 
   async findAdvertisingById(id: string) {
-    const advertising = await this.select(id, '*, category(*), creator(*)');
+    const advertising = await this.superbase
+      .getClient()
+      .from('advertisings')
+      .select('*, category(*), creator(*)')
+      .eq('id', id)
+      .single()
+      ?.then(({ data }) => data);
+
+    if (!advertising) {
+      throw new NotFoundException(`advertising is not defined`);
+    }
 
     const comments = await this.superbase
       .getClient()
@@ -48,11 +75,22 @@ export class AdvertisingService extends BaseService<
           (element) => element !== creator,
         );
       else advertising.likes.push(creator);
-      await this.edit(id, { likes: advertising.likes } as any);
+      await this.editLikeOrViewOfAdvertising(id, { likes: advertising.likes });
       return true;
     } catch (error) {
       return false;
     }
+  }
+
+  editLikeOrViewOfAdvertising(id: string, dto: any) {
+    return this.superbase
+      .getClient()
+      .from('advertisings')
+      .update(dto)
+      .eq('id', id)
+      ?.select()
+      ?.single()
+      ?.then(({ data }) => data);
   }
 
   async viewAdvertising(id: string, creator: string) {
@@ -61,7 +99,9 @@ export class AdvertisingService extends BaseService<
       if (!advertising.views.find((element) => element === creator)) {
         advertising.views.push(creator);
       }
-      await this.edit(id, { views: advertising.views } as any);
+      await this.editLikeOrViewOfAdvertising(id, {
+        views: advertising.views,
+      });
       return true;
     } catch (error) {
       return false;
@@ -174,11 +214,17 @@ export class AdvertisingService extends BaseService<
       city: dto.city,
     };
 
-    return this.create(data as any);
+    return this.superbase
+      .getClient()
+      .from('advertisings')
+      .insert(data)
+      ?.select()
+      ?.single()
+      ?.then(({ data }) => data);
   }
 
   async editAdvertising(dto: EditAdvertisingDTO, creator: string, id: string) {
-    const advertising = await this.select(id);
+    const advertising = await this.findAdvertisingById(id);
 
     if (advertising?.creator?.id !== creator) {
       throw new BadRequestException('only creator can update');
@@ -200,6 +246,13 @@ export class AdvertisingService extends BaseService<
       viewable: dto.isViewable || advertising.viewable,
     };
 
-    return this.edit(id, data);
+    return this.superbase
+      .getClient()
+      .from('advertisings')
+      .update(data)
+      .eq('id', id)
+      ?.select()
+      ?.single()
+      ?.then(({ data }) => data);
   }
 }

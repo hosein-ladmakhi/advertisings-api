@@ -7,10 +7,10 @@ import { UsersModule } from './users/users.module';
 import { CategoriesModule } from './categories/categories.module';
 import { UploadModule } from './upload/upload.module';
 import { AdvertisingModule } from './advertising/advertising.module';
-import { BaseService } from './common/services/base-service.service';
 import { LocationsModule } from './locations/locations.module';
 import { ChatsModule } from './chats/chats.module';
-import { WsGuardService } from './common/services/ws-guard.service';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { SubscriptionsUsersModule } from './subscriptions-users/subscriptions-users.module';
 
 @Module({
   imports: [
@@ -24,8 +24,8 @@ import { WsGuardService } from './common/services/ws-guard.service';
     AdvertisingModule,
     LocationsModule,
     ChatsModule,
+    SubscriptionsModule,
+    SubscriptionsUsersModule,
   ],
-  providers: [BaseService],
-  exports: [BaseService],
 })
 export class AppModule {}

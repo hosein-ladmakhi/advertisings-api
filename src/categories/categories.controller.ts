@@ -21,8 +21,8 @@ export class CategoriesController {
   private readonly categoriesService: CategoriesService;
 
   @Get()
-  findCategories() {
-    return this.categoriesService.findCategories();
+  findCategories(@Param() params: any) {
+    return this.categoriesService.findCategories(params);
   }
 
   @Get(':id')

@@ -1,27 +1,96 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { UpdateUserDTO } from './dtos/update-user.dto';
-import { BaseService } from 'src/common/services/base-service.service';
+import { SupabaseService } from 'src/common/supabase/supabase.service';
 
 @Injectable()
-export class UsersService extends BaseService<{}, UpdateUserDTO> {
-  public entity: string = 'users';
-  constructor() {
-    super();
-  }
+export class UsersService {
+  @Inject() private readonly supabaseService: SupabaseService;
+  constructor() {}
 
   async deleteUser(id: string) {
-    return this.delete(id);
+    await this.findUserById(id);
+    try {
+      const response = await this.supabaseService
+        .getClient()
+        .from('users')
+        .delete({ count: 'exact' })
+        .eq('id', id);
+      if (response?.count === 0) return false;
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   async updateUser(id: string, dto: UpdateUserDTO) {
-    return this.edit(id, dto);
+    if (dto.username) {
+      const checkUsername = await this.supabaseService
+        .getClient()
+        .from('categories')
+        .select()
+        .eq('username', dto.username)
+        .neq('id', id)
+        .single();
+      if (checkUsername?.data?.id) {
+        throw new ConflictException('duplicated username');
+      }
+    }
+
+    if (dto.email) {
+      const checkEmail = await this.supabaseService
+        .getClient()
+        .from('categories')
+        .select()
+        .eq('email', dto.email)
+        .neq('id', id)
+        .single();
+      if (checkEmail?.data?.id) {
+        throw new ConflictException('duplicated email');
+      }
+    }
+
+    return this.supabaseService
+      .getClient()
+      .from('users')
+      .update(dto)
+      .eq('id', id)
+      .select()
+      .single()
+      .then(({ data }) => data);
   }
 
   async findUserById(id: string) {
-    return this.select(id);
+    const user = await this.supabaseService
+      .getClient()
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single()
+      ?.then(({ data }) => data);
+
+    if (!user) {
+      throw new NotFoundException('user is not defined');
+    }
+
+    return user;
   }
 
-  async findUsers() {
-    return this.selectAll(0, 10);
+  async findUsers(params: any) {
+    const page = params.page || 0;
+    const limit = params.limit || 10;
+
+    const entities = await this.supabaseService
+      .getClient()
+      .from('users')
+      .select('*')
+      .range(page * limit, page * limit + limit)
+      .order('created_at', { ascending: false });
+
+    return entities?.data;
   }
 }

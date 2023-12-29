@@ -11,6 +11,8 @@ import {
 import { UsersService } from './users.service';
 import { UpdateUserDTO } from './dtos/update-user.dto';
 import { JwtGuard } from 'src/auth/guards/jwt.guard';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { User } from '@supabase/supabase-js';
 
 @UseGuards(JwtGuard)
 @Controller('users')
@@ -18,8 +20,13 @@ export class UsersController {
   @Inject(UsersService) private readonly usersService: UsersService;
 
   @Get()
-  findUsers() {
-    return this.usersService.findUsers();
+  findUsers(@Param() params: any) {
+    return this.usersService.findUsers(params);
+  }
+
+  @Get('profile')
+  findOwnUser(@CurrentUser() user: User) {
+    return this.usersService.findUserById(user.id);
   }
 
   @Get(':id')
@@ -27,9 +34,9 @@ export class UsersController {
     return this.usersService.findUserById(id);
   }
 
-  @Patch(':id')
-  updateUserById(@Param('id') id: string, @Body() dto: UpdateUserDTO) {
-    return this.usersService.updateUser(id, dto);
+  @Patch()
+  updateUser(@CurrentUser() user: User, @Body() dto: UpdateUserDTO) {
+    return this.usersService.updateUser(user.id, dto);
   }
 
   @Delete(':id')

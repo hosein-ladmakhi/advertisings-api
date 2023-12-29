@@ -15,6 +15,7 @@ import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { CreateCommentDTO } from './dtos/create-comment.dto';
 import { CreateAdvertisingDTO } from './dtos/create-advertising.dto';
 import { EditAdvertisingDTO } from './dtos/edit-advertising.dto';
+import { User } from '@supabase/supabase-js';
 
 @UseGuards(JwtGuard)
 @Controller('advertising')
@@ -22,8 +23,16 @@ export class AdvertisingController {
   @Inject() private readonly advertisingService: AdvertisingService;
 
   @Get()
-  getAdvertisings() {
-    return this.advertisingService.findAllAdvertisings();
+  getAdvertisings(@Param() params: Record<string, any>) {
+    return this.advertisingService.findAllAdvertisings(params);
+  }
+
+  @Get('own')
+  getOwnAdvertisings(
+    @Param() params: Record<string, any>,
+    @CurrentUser() user: User,
+  ) {
+    return this.advertisingService.findAllUserAdvertisings(params, user);
   }
 
   @Get(':id')
@@ -32,28 +41,28 @@ export class AdvertisingController {
   }
 
   @Post('like/:id')
-  likeOrDislikeAdvertising(@CurrentUser() user: any, @Param('id') id: string) {
+  likeOrDislikeAdvertising(@CurrentUser() user: User, @Param('id') id: string) {
     return this.advertisingService.likeOrDislikeAdvertising(id, user.id);
   }
 
   @Post('view/:id')
-  viewAdvertising(@CurrentUser() user: any, @Param('id') id: string) {
+  viewAdvertising(@CurrentUser() user: User, @Param('id') id: string) {
     return this.advertisingService.viewAdvertising(id, user.id);
   }
 
   @Post('comment')
-  createComment(@CurrentUser() user: any, @Body() dto: CreateCommentDTO) {
+  createComment(@CurrentUser() user: User, @Body() dto: CreateCommentDTO) {
     return this.advertisingService.newComment(user.id, dto);
   }
 
   @Delete('comment/:id')
-  deleteComment(@CurrentUser() user: any, @Param('id') id: string) {
+  deleteComment(@CurrentUser() user: User, @Param('id') id: string) {
     return this.advertisingService.deleteComment(id, user?.id);
   }
 
   @Post()
   createAdvertising(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Body() dto: CreateAdvertisingDTO,
   ) {
     return this.advertisingService.createAdvertising(dto, user?.id);
@@ -61,7 +70,7 @@ export class AdvertisingController {
 
   @Patch(':id')
   editAdvertising(
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Body() dto: EditAdvertisingDTO,
     @Param('id') id: string,
   ) {

@@ -4,7 +4,6 @@ import {
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
-  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
@@ -18,9 +17,12 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
   handleDisconnect(client: Socket) {
-    this.server.emit('user-status', { online: false, user: this.user });
+    this.onlineUsers = this.onlineUsers.filter((e) => e !== this.user.id);
+    this.server.emit('user-status', { users: this.onlineUsers });
   }
   user: any;
+
+  onlineUsers: string[] = [];
 
   @Inject(SupabaseService) private readonly supabaseService: SupabaseService;
 
@@ -28,11 +30,6 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleConnection(client: Socket, ...args: any[]) {
     this.user = await this.wsGuardService.verify(client.handshake.auth?.token);
-    this.server.emit('user-status', {
-      online: true,
-      user: this.user,
-    });
-    console.log('salam');
   }
 
   @SubscribeMessage('send-message')
@@ -47,11 +44,13 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         receiver: body.receiver,
         sender: this.user.id,
         content: body.content,
-        reply: body?.reply,
+        ...(body?.reply ? { reply: body?.reply } : {}),
       })
       ?.select('*, sender(*), receiver(*), reply(*)')
       ?.single()
-      ?.then(({ data }) => data);
+      ?.then((response) => {
+        return response.data;
+      });
 
     client.broadcast.emit('send-message-notify', message);
   }
@@ -68,6 +67,26 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  @SubscribeMessage('read-messages')
+  async readMessages(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: any,
+  ) {
+    for (let index = 0; index < body.messages.length; index++) {
+      const element = body.messages[index];
+      console.log(element);
+      await this.supabaseService
+        .getClient()
+        .from('chats')
+        .update({ seen: true })
+        .eq('id', element)
+        ?.select()
+        ?.single();
+    }
+
+    client.broadcast.emit('notift-read-messages', { messages: body.messages });
+  }
+
   @SubscribeMessage('stop-typing')
   async userStopTyping(
     @ConnectedSocket() client: Socket,
@@ -78,5 +97,11 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       status: false,
       with: body.with,
     });
+  }
+
+  @SubscribeMessage('become-online')
+  async handleOnlineStatus() {
+    this.onlineUsers.push(this.user?.id);
+    this.server.emit('user-status', { users: this.onlineUsers });
   }
 }

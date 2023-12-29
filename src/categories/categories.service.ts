@@ -1,20 +1,27 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SupabaseService } from 'src/common/supabase/supabase.service';
 import { UpdateCategoryDTO } from './dtos/update-category.dto';
 import { CreateCategoryDTO } from './dtos/create-category.dto';
-import { BaseService } from 'src/common/services/base-service.service';
 
 @Injectable()
-export class CategoriesService extends BaseService<
-  CreateCategoryDTO,
-  UpdateCategoryDTO
-> {
-  public entity: string = 'categories';
+export class CategoriesService {
   @Inject(SupabaseService)
   private readonly supabaseClientService: SupabaseService;
 
   async deleteCategories(id: string) {
-    const category = await this.select(id);
+    const category = await this.supabaseClientService
+      .getClient()
+      .from('categories')
+      .select('*')
+      .eq('id', id)
+      .single()
+      ?.then(({ data }) => data);
+
     if (category?.parent) {
       await this.supabaseClientService
         .getClient()
@@ -40,7 +47,17 @@ export class CategoriesService extends BaseService<
         .delete()
         .eq('id', category?.children);
     }
-    return this.delete(id);
+    try {
+      const response = await this.supabaseClientService
+        .getClient()
+        .from('categories')
+        .delete({ count: 'exact' })
+        .eq('id', id);
+      if (response?.count === 0) return false;
+      return true;
+    } catch (error) {
+      return false;
+    }
   }
 
   async updateCategories(id: string, dto: UpdateCategoryDTO) {
@@ -54,7 +71,15 @@ export class CategoriesService extends BaseService<
     if (checkUniqueName?.data?.id) {
       throw new ConflictException('duplicated name');
     }
-    const category = await this.edit(id, dto);
+    const category = await this.supabaseClientService
+      .getClient()
+      .from('categories')
+      .update(dto)
+      .eq('id', id)
+      ?.select()
+      ?.single()
+      ?.then(({ data }) => data);
+
     if (dto.parent && category.parent !== dto.parent) {
       await this.updateCategories(dto.parent, { children: category.id });
     }
@@ -73,7 +98,13 @@ export class CategoriesService extends BaseService<
       throw new ConflictException('duplicated name');
     }
 
-    const category = await this.create(dto);
+    const category = await this.supabaseClientService
+      .getClient()
+      .from('categories')
+      .insert(dto)
+      ?.select()
+      ?.single()
+      ?.then(({ data }) => data);
 
     if (dto.parent) {
       this.updateCategories(dto.parent, { children: category.id });
@@ -83,10 +114,32 @@ export class CategoriesService extends BaseService<
   }
 
   async findCategoryById(id: string) {
-    return this.select(id);
+    const category = await this.supabaseClientService
+      .getClient()
+      .from('categories')
+      .select('*, parent(*), children(*)')
+      .eq('id', id)
+      .single()
+      ?.then(({ data }) => data);
+
+    if (!category) {
+      throw new NotFoundException(`categories is not defined`);
+    }
+
+    return category;
   }
 
-  async findCategories() {
-    return this.selectAll(0, 10, '*');
+  async findCategories(params: any) {
+    const page = params.page || 0;
+    const limit = params.limit || 10;
+
+    const entities = await this.supabaseClientService
+      .getClient()
+      .from('categories')
+      .select('*, parent(*), children(*)')
+      .range(page * limit, page * limit + limit)
+      .order('created_at', { ascending: false });
+
+    return entities?.data;
   }
 }
