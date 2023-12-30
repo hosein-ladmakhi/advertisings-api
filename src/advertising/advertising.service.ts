@@ -59,6 +59,7 @@ export class AdvertisingService {
       .getClient()
       .from('comments')
       .select('*, parent(*), author(*),children(*)')
+      .order('created_at', { ascending: false })
       .eq('advertising', id);
 
     return {
