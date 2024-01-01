@@ -14,19 +14,59 @@ export class AdvertisingService {
   constructor(public superbase: SupabaseService) {}
 
   async findAllAdvertisings(params) {
-    const page = params.page || 0;
-    const limit = params.limit || 10;
-
-    const entities = await this.superbase
+    console.log(params);
+    const page = +(params.page || 0);
+    const limit = +(params.limit || 1);
+    const query = this.superbase
       .getClient()
       .from('advertisings')
       .select('*, category(*), creator(*)')
-      .range(page * limit, page * limit + limit)
       .order('created_at', { ascending: false });
 
-    return entities?.data;
+    const entities = await query;
+    return {
+      rows: [...entities?.data]?.splice(page, limit),
+      count: entities?.data?.length,
+    };
   }
 
+  async findAllRelatedAdvertisings(id: string, category: string, params) {
+    console.log(params);
+    const page = +(params.page || 0);
+    const limit = +(params.limit || 1);
+    const query = this.superbase
+      .getClient()
+      .from('advertisings')
+      .select('*, category(*), creator(*)')
+      .eq('category', category)
+      .neq('id', id)
+      .order('created_at', { ascending: false });
+
+    const entities = await query;
+    return {
+      rows: [...entities?.data]?.splice(page, limit),
+      count: entities?.data?.length,
+    };
+  }
+  async findAllRelatedOwnerAdvertisings(id: string, owner: string, params) {
+    console.log(id, owner);
+    const page = +(params.page || 0);
+    const limit = +(params.limit || 1);
+    const query = this.superbase
+      .getClient()
+      .from('advertisings')
+      .select('*, category(*), creator(*)')
+      .eq('creator', owner)
+      .neq('id', id)
+      .order('created_at', { ascending: false });
+
+    const entities = await query;
+    console.log(entities?.data);
+    return {
+      rows: [...entities?.data]?.splice(page, limit),
+      count: entities?.data?.length,
+    };
+  }
   async findAllUserAdvertisings(params, user: any) {
     const page = params.page || 0;
     const limit = params.limit || 10;
@@ -36,10 +76,8 @@ export class AdvertisingService {
       .from('advertisings')
       .select('*, category(*), creator(*)')
       .eq('creator', user?.id)
-      .range(page * limit, page * limit + limit)
       .order('created_at', { ascending: false });
-
-    return entities?.data;
+    return [...entities?.data]?.splice(page, limit);
   }
 
   async findAdvertisingById(id: string) {

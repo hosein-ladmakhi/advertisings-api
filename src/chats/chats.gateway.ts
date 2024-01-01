@@ -16,11 +16,11 @@ import { SupabaseService } from 'src/common/supabase/supabase.service';
 export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
-  handleDisconnect(client: Socket) {
-    this.onlineUsers = this.onlineUsers.filter((e) => e !== this.user.id);
+  async handleDisconnect(client: Socket) {
+    const user = await this.wsGuardService.verify(client.handshake.auth?.token);
+    this.onlineUsers = this.onlineUsers.filter((e) => e !== user.id);
     this.server.emit('user-status', { users: this.onlineUsers });
   }
-  user: any;
 
   onlineUsers: string[] = [];
 
@@ -28,21 +28,20 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @Inject(WsGuardService) wsGuardService: WsGuardService;
 
-  async handleConnection(client: Socket, ...args: any[]) {
-    this.user = await this.wsGuardService.verify(client.handshake.auth?.token);
-  }
+  async handleConnection(client: Socket, ...args: any[]) {}
 
   @SubscribeMessage('send-message')
   async sendMessage(
     @MessageBody() body: any,
     @ConnectedSocket() client: Socket,
   ) {
+    const user = await this.wsGuardService.verify(client.handshake.auth?.token);
     const message = await this.supabaseService
       .getClient()
       .from('chats')
       .insert({
         receiver: body.receiver,
-        sender: this.user.id,
+        sender: user.id,
         content: body.content,
         ...(body?.reply ? { reply: body?.reply } : {}),
       })
@@ -51,7 +50,7 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       ?.then((response) => {
         return response.data;
       });
-
+    client.emit('send-message-notify', message);
     client.broadcast.emit('send-message-notify', message);
   }
 
@@ -60,8 +59,9 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() body: any,
   ) {
+    const user = await this.wsGuardService.verify(client.handshake.auth?.token);
     client.broadcast.emit('typing', {
-      user: this.user,
+      user: user,
       status: true,
       with: body.with,
     });
@@ -84,7 +84,7 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ?.single();
     }
 
-    client.broadcast.emit('notift-read-messages', { messages: body.messages });
+    client.broadcast.emit('notify-read-messages', { messages: body.messages });
   }
 
   @SubscribeMessage('stop-typing')
@@ -92,16 +92,18 @@ export class ChatsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() body: any,
   ) {
+    const user = await this.wsGuardService.verify(client.handshake.auth?.token);
     client.broadcast.emit('typing', {
-      user: this.user,
+      user: user,
       status: false,
       with: body.with,
     });
   }
 
   @SubscribeMessage('become-online')
-  async handleOnlineStatus() {
-    this.onlineUsers.push(this.user?.id);
+  async handleOnlineStatus(@ConnectedSocket() client: Socket) {
+    const user = await this.wsGuardService.verify(client.handshake.auth?.token);
+    this.onlineUsers.push(user?.id);
     this.server.emit('user-status', { users: this.onlineUsers });
   }
 }

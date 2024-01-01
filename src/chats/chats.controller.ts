@@ -13,4 +13,9 @@ export class ChatsController {
   getChats(@CurrentUser() user: User, @Param('receiverId') receiverId: string) {
     return this.chatsService.getChats(user?.id, receiverId);
   }
+
+  @Get('/chat-list')
+  getChatsList(@CurrentUser() user: User) {
+    return this.chatsService.getChatsUser(user?.id);
+  }
 }

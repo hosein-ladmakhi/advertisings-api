@@ -18,7 +18,6 @@ export class UploadService {
 
   async uploadAdvertisingImages(images: File[]) {
     const createdImages = [];
-    console.log(images);
     for (let i = 0; i < images.length; i++) {
       const image = images[i];
 

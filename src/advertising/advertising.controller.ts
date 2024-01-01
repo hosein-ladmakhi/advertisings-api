@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AdvertisingService } from './advertising.service';
@@ -23,13 +24,38 @@ export class AdvertisingController {
   @Inject() private readonly advertisingService: AdvertisingService;
 
   @Get()
-  getAdvertisings(@Param() params: Record<string, any>) {
+  getAdvertisings(@Query() params: Record<string, any>) {
     return this.advertisingService.findAllAdvertisings(params);
+  }
+  @Get('related/owner/:id/:owner')
+  getRelatedOwnerAdvertisings(
+    @Query() params: Record<string, any>,
+    @Param('id') id: string,
+    @Param('owner') owner: string,
+  ) {
+    return this.advertisingService.findAllRelatedOwnerAdvertisings(
+      id,
+      owner,
+      params,
+    );
+  }
+
+  @Get('related/:id/:category')
+  getRelatedAdvertisings(
+    @Query() params: Record<string, any>,
+    @Param('id') id: string,
+    @Param('category') category: string,
+  ) {
+    return this.advertisingService.findAllRelatedAdvertisings(
+      id,
+      category,
+      params,
+    );
   }
 
   @Get('own')
   getOwnAdvertisings(
-    @Param() params: Record<string, any>,
+    @Query() params: Record<string, any>,
     @CurrentUser() user: User,
   ) {
     return this.advertisingService.findAllUserAdvertisings(params, user);
